@@ -34,47 +34,93 @@ public class FootballApiService
             // Check cache first
             if (_cache.TryGetValue(cacheKey, out ApiResponse<T>? cachedResult))
             {
-                _logger.LogInformation("Cache hit for {CacheKey}", cacheKey);
+                _logger.LogInformation("? Cache hit for {CacheKey}", cacheKey);
                 return cachedResult;
             }
 
-            // Get API key from configuration
+            // Get and validate API key
             var apiKey = _configuration["FootballApi:ApiKey"];
-            if (string.IsNullOrEmpty(apiKey) || apiKey == "YOUR_API_KEY_HERE")
+            var apiKeyExists = !string.IsNullOrEmpty(apiKey) && apiKey != "YOUR_API_KEY_HERE";
+
+            if (!apiKeyExists)
             {
-                _logger.LogError("API key not configured");
+                _logger.LogError("? API key not configured or invalid. Check FootballApi__ApiKey environment variable.");
                 return null;
             }
 
-            // Create request with relative endpoint (BaseAddress is set in Program.cs)
-            // HttpClient will automatically combine BaseAddress + endpoint
+            // Log masked API key (first 4 characters only)
+            var maskedKey = apiKey!.Length >= 4 ? $"{apiKey.Substring(0, 4)}****" : "****";
+            _logger.LogInformation("?? API Key exists: Yes, Starting with: {MaskedKey}", maskedKey);
+
+            // Verify BaseAddress
+            if (_httpClient.BaseAddress == null)
+            {
+                _logger.LogError("? HttpClient BaseAddress is null. Check Program.cs configuration.");
+                return null;
+            }
+
+            // Build full URL for logging (BaseAddress + relative endpoint)
+            var fullUrl = new Uri(_httpClient.BaseAddress, endpoint).ToString();
+
+            // Log request details BEFORE making the call
+            _logger.LogInformation("?? Calling API-FOOTBALL:");
+            _logger.LogInformation("   ? Full URL: {FullUrl}", fullUrl);
+            _logger.LogInformation("   ? Endpoint: {Endpoint}", endpoint);
+            _logger.LogInformation("   ? BaseAddress: {BaseAddress}", _httpClient.BaseAddress);
+            _logger.LogInformation("   ? Method: GET");
+            _logger.LogInformation("   ? Header: x-apisports-key = {MaskedKey}", maskedKey);
+
+            // Create request with relative endpoint
             var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
             request.Headers.Add("x-apisports-key", apiKey);
 
-            // Log the full URL for debugging
-            var baseUrl = _httpClient.BaseAddress?.ToString() ?? "No BaseAddress";
-            var fullUrl = $"{baseUrl.TrimEnd('/')}{endpoint}";
-            _logger.LogInformation("Calling API-FOOTBALL: {FullUrl} with API key: {ApiKeyMasked}", 
-                fullUrl, 
-                apiKey.Length > 8 ? $"{apiKey.Substring(0, 4)}...{apiKey.Substring(apiKey.Length - 4)}" : "***");
-
+            // Make the API call
+            _logger.LogInformation("? Sending request to API-FOOTBALL...");
             var response = await _httpClient.SendAsync(request);
 
-            // Improved error handling with detailed logging
+            // Log response status immediately
+            _logger.LogInformation("?? Response received:");
+            _logger.LogInformation("   ? Status Code: {StatusCode} ({StatusCodeNumber})", 
+                response.StatusCode, (int)response.StatusCode);
+            _logger.LogInformation("   ? Success: {IsSuccess}", response.IsSuccessStatusCode);
+
+            // Handle non-success responses with detailed logging
             if (!response.IsSuccessStatusCode)
             {
-                var error = await response.Content.ReadAsStringAsync();
-                _logger.LogError(
-                    "API-FOOTBALL returned {StatusCode}: {Error}. Request URL: {FullUrl}",
-                    response.StatusCode,
-                    error,
-                    fullUrl
-                );
+                var errorBody = await response.Content.ReadAsStringAsync();
+                var errorLength = errorBody?.Length ?? 0;
+
+                _logger.LogError("? API-FOOTBALL returned error:");
+                _logger.LogError("   ? Status Code: {StatusCode} ({StatusCodeNumber})", 
+                    response.StatusCode, (int)response.StatusCode);
+                _logger.LogError("   ? URL: {FullUrl}", fullUrl);
+                _logger.LogError("   ? Response Body Length: {Length} characters", errorLength);
+                _logger.LogError("   ? Response Body: {ErrorBody}", 
+                    string.IsNullOrEmpty(errorBody) ? "(empty)" : errorBody);
+                _logger.LogError("   ? Endpoint: {Endpoint}", endpoint);
+
+                // Additional helpful information
+                if ((int)response.StatusCode == 401)
+                {
+                    _logger.LogError("?? 401 Unauthorized - Check API key validity");
+                }
+                else if ((int)response.StatusCode == 429)
+                {
+                    _logger.LogError("?? 429 Rate Limit - API quota exceeded");
+                }
+                else if ((int)response.StatusCode == 404)
+                {
+                    _logger.LogError("?? 404 Not Found - Check endpoint URL");
+                }
+
                 return null;
             }
 
+            // Success: read and log response
             var content = await response.Content.ReadAsStringAsync();
-            _logger.LogInformation("API-FOOTBALL response received successfully. Length: {Length} characters", content.Length);
+            _logger.LogInformation("? API-FOOTBALL response received successfully:");
+            _logger.LogInformation("   ? Response Length: {Length} characters", content.Length);
+            _logger.LogInformation("   ? Deserializing JSON...");
 
             var result = JsonSerializer.Deserialize<ApiResponse<T>>(content, new JsonSerializerOptions
             {
@@ -83,30 +129,49 @@ public class FootballApiService
 
             if (result != null)
             {
+                _logger.LogInformation("? JSON deserialization successful");
+                _logger.LogInformation("   ? Results count: {Count}", result.Results);
+
                 // Cache the result
                 var cacheOptions = new MemoryCacheEntryOptions
                 {
                     AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(_cacheDurationMinutes)
                 };
                 _cache.Set(cacheKey, result, cacheOptions);
-                _logger.LogInformation("Cached result for {CacheKey}", cacheKey);
+                _logger.LogInformation("?? Cached result for {CacheKey} (expires in {Minutes} minutes)", 
+                    cacheKey, _cacheDurationMinutes);
+            }
+            else
+            {
+                _logger.LogWarning("?? JSON deserialization returned null");
             }
 
             return result;
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "HTTP error calling API-FOOTBALL: {Endpoint}", endpoint);
+            _logger.LogError(ex, "? HTTP error calling API-FOOTBALL:");
+            _logger.LogError("   ? Endpoint: {Endpoint}", endpoint);
+            _logger.LogError("   ? Message: {Message}", ex.Message);
+            _logger.LogError("   ? Inner Exception: {InnerException}", ex.InnerException?.Message ?? "None");
             return null;
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "JSON deserialization error for endpoint: {Endpoint}", endpoint);
+            _logger.LogError(ex, "? JSON deserialization error:");
+            _logger.LogError("   ? Endpoint: {Endpoint}", endpoint);
+            _logger.LogError("   ? Message: {Message}", ex.Message);
+            _logger.LogError("   ? Path: {Path}", ex.Path ?? "N/A");
+            _logger.LogError("   ? Line Number: {LineNumber}", ex.LineNumber);
             return null;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error calling API-FOOTBALL: {Endpoint}", endpoint);
+            _logger.LogError(ex, "? Unexpected error calling API-FOOTBALL:");
+            _logger.LogError("   ? Endpoint: {Endpoint}", endpoint);
+            _logger.LogError("   ? Exception Type: {ExceptionType}", ex.GetType().Name);
+            _logger.LogError("   ? Message: {Message}", ex.Message);
+            _logger.LogError("   ? Stack Trace: {StackTrace}", ex.StackTrace);
             return null;
         }
     }
