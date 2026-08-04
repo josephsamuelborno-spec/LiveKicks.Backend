@@ -1,6 +1,8 @@
 using LiveKicks.Backend.Services;
+using LiveKicks.Backend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 namespace LiveKicks.Backend.Controllers;
 
@@ -10,11 +12,64 @@ public class FootballController : ControllerBase
 {
     private readonly FootballApiService _footballService;
     private readonly ILogger<FootballController> _logger;
+    private readonly IConfiguration _configuration;
 
-    public FootballController(FootballApiService footballService, ILogger<FootballController> logger)
+    public FootballController(FootballApiService footballService, ILogger<FootballController> logger, IConfiguration configuration)
     {
         _footballService = footballService;
         _logger = logger;
+        _configuration = configuration;
+    }
+
+    /// <summary>
+    /// Diagnostic endpoint to verify API configuration and connectivity
+    /// </summary>
+    [HttpGet("diagnostics")]
+    public IActionResult GetDiagnostics()
+    {
+        try
+        {
+            var apiKey = _configuration["FootballApi:ApiKey"];
+            var baseUrl = _configuration["FootballApi:BaseUrl"];
+            var cacheDuration = _configuration["FootballApi:CacheDurationMinutes"];
+
+            var apiKeyExists = !string.IsNullOrEmpty(apiKey) && apiKey != "YOUR_API_KEY_HERE";
+            var maskedKey = apiKeyExists && apiKey!.Length >= 4 ? $"{apiKey.Substring(0, 4)}****" : "Not configured";
+
+            var diagnostics = new
+            {
+                timestamp = DateTime.UtcNow,
+                environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Unknown",
+                configuration = new
+                {
+                    baseUrl = baseUrl ?? "Not configured",
+                    apiKeyConfigured = apiKeyExists,
+                    apiKeyMasked = maskedKey,
+                    cacheDurationMinutes = cacheDuration ?? "Not configured"
+                },
+                environmentVariables = new
+                {
+                    footballApiKeyEnvVar = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FootballApi__ApiKey")) ? "Set" : "Not set",
+                    footballApiBaseUrlEnvVar = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FootballApi__BaseUrl")) ? "Set" : "Not set"
+                },
+                notes = new[]
+                {
+                    "If API key shows 'Not configured', set FootballApi__ApiKey environment variable on Render",
+                    "BaseUrl should be: https://v3.football.api-sports.io",
+                    "Check Render logs for detailed API request/response information"
+                }
+            };
+
+            _logger.LogInformation("Diagnostics endpoint called - API Key Configured: {ApiKeyConfigured}, BaseUrl: {BaseUrl}", 
+                apiKeyExists, baseUrl);
+
+            return Ok(diagnostics);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in diagnostics endpoint");
+            return StatusCode(500, new { message = "Diagnostics error", error = ex.Message });
+        }
     }
 
     /// <summary>
@@ -31,7 +86,23 @@ public class FootballController : ControllerBase
             if (result == null)
             {
                 _logger.LogWarning("FootballApiService returned null for today's fixtures");
-                return StatusCode(500, new { message = "Failed to fetch fixtures" });
+
+                // During debugging, provide helpful diagnostic info
+                var apiKey = _configuration["FootballApi:ApiKey"];
+                var apiKeyConfigured = !string.IsNullOrEmpty(apiKey) && apiKey != "YOUR_API_KEY_HERE";
+
+                return StatusCode(500, new 
+                { 
+                    message = "Failed to fetch fixtures from API-FOOTBALL",
+                    debugInfo = new
+                    {
+                        apiKeyConfigured = apiKeyConfigured,
+                        suggestion = apiKeyConfigured 
+                            ? "Check Render logs for detailed API error. The API may be rate-limited, returning errors, or the endpoint URL may be incorrect."
+                            : "API key not configured. Set FootballApi__ApiKey environment variable in Render.",
+                        diagnosticsEndpoint = "/api/football/diagnostics"
+                    }
+                });
             }
 
             _logger.LogInformation("Successfully retrieved {Count} fixtures for today", result.Results);
