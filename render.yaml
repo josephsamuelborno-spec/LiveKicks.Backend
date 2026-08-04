@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: livekicks-backend
+    runtime: docker
+    dockerfilePath: ./LiveKicks.Backend/Dockerfile
+    dockerContext: ./LiveKicks.Backend
+    region: oregon
+    plan: free
+    branch: main
+    healthCheckPath: /api/football/health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+      - key: FootballApi__BaseUrl
+        value: https://v3.football.api-sports.io
+      - key: FootballApi__ApiKey
+        sync: false
+      - key: FootballApi__CacheDurationMinutes
+        value: 5
