@@ -25,17 +25,22 @@ public class FootballController : ControllerBase
     {
         try
         {
+            _logger.LogInformation("GetFixturesToday endpoint called");
             var result = await _footballService.GetFixturesTodayAsync();
+
             if (result == null)
             {
+                _logger.LogWarning("FootballApiService returned null for today's fixtures");
                 return StatusCode(500, new { message = "Failed to fetch fixtures" });
             }
+
+            _logger.LogInformation("Successfully retrieved {Count} fixtures for today", result.Results);
             return Ok(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in GetFixturesToday");
-            return StatusCode(500, new { message = "Internal server error" });
+            return StatusCode(500, new { message = "Internal server error", error = ex.Message });
         }
     }
 

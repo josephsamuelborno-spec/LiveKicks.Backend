@@ -46,16 +46,36 @@ public class FootballApiService
                 return null;
             }
 
-            // Add API key header
+            // Create request with relative endpoint (BaseAddress is set in Program.cs)
+            // HttpClient will automatically combine BaseAddress + endpoint
             var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
             request.Headers.Add("x-apisports-key", apiKey);
 
-            _logger.LogInformation("Calling API-FOOTBALL: {Endpoint}", endpoint);
+            // Log the full URL for debugging
+            var baseUrl = _httpClient.BaseAddress?.ToString() ?? "No BaseAddress";
+            var fullUrl = $"{baseUrl.TrimEnd('/')}{endpoint}";
+            _logger.LogInformation("Calling API-FOOTBALL: {FullUrl} with API key: {ApiKeyMasked}", 
+                fullUrl, 
+                apiKey.Length > 8 ? $"{apiKey.Substring(0, 4)}...{apiKey.Substring(apiKey.Length - 4)}" : "***");
 
             var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+
+            // Improved error handling with detailed logging
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogError(
+                    "API-FOOTBALL returned {StatusCode}: {Error}. Request URL: {FullUrl}",
+                    response.StatusCode,
+                    error,
+                    fullUrl
+                );
+                return null;
+            }
 
             var content = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("API-FOOTBALL response received successfully. Length: {Length} characters", content.Length);
+
             var result = JsonSerializer.Deserialize<ApiResponse<T>>(content, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
