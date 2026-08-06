@@ -23,7 +23,7 @@ public class TeamAIProfile
     public FormStats Last5Home { get; set; } = new();
     public FormStats Last5Away { get; set; } = new();
 
-    // Scoring Statistics
+    // Overall Scoring Statistics
     public double AvgGoalsScored { get; set; }
     public double AvgGoalsConceded { get; set; }
     public double ExpectedGoals { get; set; }
@@ -50,51 +50,139 @@ public class TeamAIProfile
     public int CurrentLoseStreak { get; set; }
     public string FormTrend { get; set; } = "STABLE";
 
-    // Future-Ready Fields
+    // Future-ready fields
     public List<InjuryInfo> Injuries { get; set; } = new();
     public LineupInfo? Lineup { get; set; }
 
-    // Backward compatibility properties for older AI services
+
+    // =====================================================
+    // BACKWARD COMPATIBILITY FOR AI ENGINE
+    // =====================================================
+
     public FormStats Form => Last10Matches;
+
     public int Standing => LeaguePosition;
+
     public int InjuryCount => Injuries?.Count ?? 0;
 }
 
+
+/// <summary>
+/// Team form statistics
+/// </summary>
 public class FormStats
 {
     public int Wins { get; set; }
     public int Draws { get; set; }
     public int Losses { get; set; }
+
     public int GoalsScored { get; set; }
     public int GoalsConceded { get; set; }
+
     public int CleanSheets { get; set; }
     public int FailedToScore { get; set; }
+
     public double PointsPerGame { get; set; }
     public double GoalsPerGame { get; set; }
     public double GoalsConcededPerGame { get; set; }
+
     public string FormString { get; set; } = string.Empty;
+
     public int MatchCount { get; set; }
+
     public List<string> Last5Results { get; set; } = new();
 
-    // Backward compatibility properties for older AI services
-    public double GoalsForAvg => MatchCount > 0 ? (double)GoalsScored / MatchCount : 0;
-    public double GoalsAgainstAvg => MatchCount > 0 ? (double)GoalsConceded / MatchCount : 0;
-    public bool ScoredIn => GoalsScored > 0;
-    public bool CleanSheet => CleanSheets > 0;
-    public object? Home => null;
-    public object? Away => null;
+
+    // ===============================
+    // AI ENGINE COMPATIBILITY
+    // ===============================
+
+    public double GoalsForAvg =>
+        MatchCount > 0
+            ? (double)GoalsScored / MatchCount
+            : 0;
+
+
+    public double GoalsAgainstAvg =>
+        MatchCount > 0
+            ? (double)GoalsConceded / MatchCount
+            : 0;
+
+
+    public PercentageStat ScoredIn =>
+        new()
+        {
+            Percentage = MatchCount > 0 && GoalsScored > 0
+                ? 100
+                : 0
+        };
+
+
+    public PercentageStat CleanSheet =>
+        new()
+        {
+            Percentage = MatchCount > 0
+                ? ((double)CleanSheets / MatchCount) * 100
+                : 0
+        };
+
+
+    // Home/Away compatibility
+    public HomeAwayStats Home { get; set; } = new();
+
+    public HomeAwayStats Away { get; set; } = new();
 }
 
+
+/// <summary>
+/// Percentage wrapper required by rating engine
+/// </summary>
+public class PercentageStat
+{
+    public double Percentage { get; set; }
+}
+
+
+/// <summary>
+/// Home/Away performance statistics
+/// </summary>
+public class HomeAwayStats
+{
+    public int Played { get; set; }
+
+    public int Win { get; set; }
+
+    public int Draw { get; set; }
+
+    public int Loss { get; set; }
+
+    public double GoalsForAvg { get; set; }
+
+    public double GoalsAgainstAvg { get; set; }
+}
+
+
+/// <summary>
+/// Injury information
+/// </summary>
 public class InjuryInfo
 {
     public string PlayerName { get; set; } = string.Empty;
+
     public string InjuryType { get; set; } = string.Empty;
+
     public string Status { get; set; } = string.Empty;
 }
 
+
+/// <summary>
+/// Predicted / confirmed lineup information
+/// </summary>
 public class LineupInfo
 {
     public string Formation { get; set; } = string.Empty;
+
     public List<string> StartingXI { get; set; } = new();
+
     public bool Confirmed { get; set; }
 }

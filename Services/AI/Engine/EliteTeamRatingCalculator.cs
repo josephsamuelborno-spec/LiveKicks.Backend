@@ -62,9 +62,9 @@ public class EliteTeamRatingCalculator
         rating += (1.0 - avgConceded) * 15;
 
         // Clean sheet rate
-        if (team.Form.CleanSheets != null)
+        if (team.Form.CleanSheets > 0)
         {
-            double cleanSheetRate = team.Form.CleanSheets.Percentage / 100.0;
+            double cleanSheetRate = team.Form.CleanSheets / 100.0;
             rating += cleanSheetRate * 30;
         }
 
@@ -217,7 +217,7 @@ public class EliteTeamRatingCalculator
         double rating = 100;
 
         // Penalty for injuries
-        int injuries = team.Injuries;
+        int injuries = team.InjuryCount;
         rating -= injuries * 8; // Each injury reduces fitness by 8 points
 
         return Math.Max(0, Math.Min(100, Math.Round(rating, 1)));
@@ -254,9 +254,9 @@ public class EliteTeamRatingCalculator
         double rating = 50;
 
         // Clean sheet rate
-        if (team.Form.CleanSheets != null)
+        if (team.Form.CleanSheets > 0)
         {
-            rating += (team.Form.CleanSheets.Percentage / 100.0) * 30;
+            rating += (team.Form.CleanSheets / 100.0) * 30;
         }
 
         // Low goals conceded

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace LiveKicks.Backend.Models.AI;
 
 /// <summary>
@@ -41,6 +43,7 @@ public class PredictionFeatures
     public double ImpliedHomeProbability { get; set; }
     public double ImpliedDrawProbability { get; set; }
     public double ImpliedAwayProbability { get; set; }
+
     public bool MarketSupportsHome { get; set; }
     public bool MarketSupportsOver25 { get; set; }
 
@@ -48,12 +51,4 @@ public class PredictionFeatures
     public double DataQualityScore { get; set; }
 }
 
-/// <summary>
-/// Confidence calculation result
-/// </summary>
-public class ConfidenceResult
-{
-    public double Confidence { get; set; }
-    public double Reliability { get; set; }
-    public Dictionary<string, double> FactorContributions { get; set; } = new();
-}
+

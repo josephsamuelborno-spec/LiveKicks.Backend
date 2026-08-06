@@ -242,4 +242,8 @@ public class ConfidenceResult
     public List<string> FactorsConsidered { get; set; } = new();
     public double AgreementRate { get; set; }
     public int StrongFactors { get; set; }
+
+    // Backward compatibility properties for older AI services
+    public double ConfidenceScore => Confidence;
+    public string OverallRisk { get; set; } = "LOW";
 }

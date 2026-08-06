@@ -21,73 +21,77 @@ public class PredictionFeatureBuilder
     /// </summary>
     public PredictionFeatures BuildFeatures(AIContextResponse context)
     {
-        _logger.LogDebug("?? Building prediction features...");
+        _logger.LogDebug("Building prediction features...");
 
         var features = new PredictionFeatures
         {
             FixtureId = context.Fixture.FixtureId,
             HomeTeamId = context.Fixture.HomeTeamId,
-            AwayTeamId = context.Fixture.AwayTeamId
+            AwayTeamId = context.Fixture.AwayTeamId,
+
+            HomeFormScore = CalculateFormScore(context.HomeTeam),
+            AwayFormScore = CalculateFormScore(context.AwayTeam),
+
+            HomeAttackStrength = CalculateAttackStrength(context.HomeTeam),
+            AwayAttackStrength = CalculateAttackStrength(context.AwayTeam),
+
+            HomeDefenseStrength = CalculateDefenseStrength(context.HomeTeam),
+            AwayDefenseStrength = CalculateDefenseStrength(context.AwayTeam),
+
+            HomeAdvantageScore = CalculateHomeAdvantage(
+                context.HomeTeam,
+                context.LeagueProfile),
+
+            AwayWeaknessScore = CalculateAwayWeakness(context.AwayTeam),
+
+            H2HHomeAdvantage = CalculateH2HAdvantage(
+                context.HeadToHead,
+                true),
+
+            H2HGoalTrend = CalculateH2HGoalTrend(context.HeadToHead),
+
+            MarketConfidence = CalculateMarketConfidence(context.MarketOdds),
+
+            ImpliedHomeProbability = OddsToProbability(context.MarketOdds.HomeWinOdds),
+            ImpliedDrawProbability = OddsToProbability(context.MarketOdds.DrawOdds),
+            ImpliedAwayProbability = OddsToProbability(context.MarketOdds.AwayWinOdds),
+
+            LeagueGoalAverage = context.LeagueProfile.AvgGoalsPerMatch,
+            LeagueUnpredictability = context.LeagueProfile.UnpredictabilityFactor,
+
+            DataQualityScore = context.DataQuality.OverallScore
         };
 
-        // Team Form Features
-        features.HomeFormScore = CalculateFormScore(context.HomeTeam);
-        features.AwayFormScore = CalculateFormScore(context.AwayTeam);
-
-        // Attack Features
-        features.HomeAttackStrength = CalculateAttackStrength(context.HomeTeam);
-        features.AwayAttackStrength = CalculateAttackStrength(context.AwayTeam);
-
-        // Defense Features
-        features.HomeDefenseStrength = CalculateDefenseStrength(context.HomeTeam);
-        features.AwayDefenseStrength = CalculateDefenseStrength(context.AwayTeam);
-
-        // Home Advantage
-        features.HomeAdvantageScore = CalculateHomeAdvantage(context.HomeTeam, context.LeagueProfile);
-        features.AwayWeaknessScore = CalculateAwayWeakness(context.AwayTeam);
-
-        // Head-to-Head Features
-        features.H2HHomeAdvantage = CalculateH2HAdvantage(context.HeadToHead, isHome: true);
-        features.H2HGoalTrend = CalculateH2HGoalTrend(context.HeadToHead);
-
-        // Market Features
-        features.MarketConfidence = CalculateMarketConfidence(context.MarketOdds);
-        features.ImpliedHomeProbability = OddsToProbability(context.MarketOdds.HomeWinOdds);
-        features.ImpliedDrawProbability = OddsToProbability(context.MarketOdds.DrawOdds);
-        features.ImpliedAwayProbability = OddsToProbability(context.MarketOdds.AwayWinOdds);
-
-        // League Intelligence
-        features.LeagueGoalAverage = context.LeagueProfile.AvgGoalsPerMatch;
-        features.LeagueUnpredictability = context.LeagueProfile.UnpredictabilityFactor;
-
-        // Data Quality
-        features.DataQualityScore = context.DataQuality.OverallScore;
-
-        _logger.LogDebug($"  ? Features built: Home Form {features.HomeFormScore:F1}, Away Form {features.AwayFormScore:F1}");
+        _logger.LogDebug(
+            $"Features built: Home Form {features.HomeFormScore:F1}, Away Form {features.AwayFormScore:F1}");
 
         return features;
     }
 
-    #region Form Scoring
 
     private double CalculateFormScore(TeamAIProfile team)
     {
-        if (team.Last10Matches.MatchCount == 0) return 50;
+        if (team.Last10Matches.MatchCount == 0)
+            return 50;
 
         double score = 0;
 
-        // Points per game (50%)
-        double ppg = team.Last10Matches.PointsPerGame;
-        double ppgScore = (ppg / 3.0) * 50;
+        double ppgScore =
+            (team.Last10Matches.PointsPerGame / 3.0) * 50;
+
         score += ppgScore;
 
-        // Goal difference (30%)
-        int goalDiff = team.Last10Matches.GoalsScored - team.Last10Matches.GoalsConceded;
-        double gdScore = Math.Min(Math.Max((goalDiff + 10) * 1.5, 0), 30);
-        score += gdScore;
 
-        // Form trend bonus (20%)
-        double trendScore = team.FormTrend switch
+        int goalDiff =
+            team.Last10Matches.GoalsScored -
+            team.Last10Matches.GoalsConceded;
+
+        score += Math.Min(
+            Math.Max((goalDiff + 10) * 1.5, 0),
+            30);
+
+
+        score += team.FormTrend switch
         {
             "EXCELLENT" => 20,
             "IMPROVING" => 15,
@@ -96,190 +100,190 @@ public class PredictionFeatureBuilder
             "POOR" => 0,
             _ => 10
         };
-        score += trendScore;
+
 
         return Math.Min(Math.Round(score, 2), 100);
     }
 
-    #endregion
-
-    #region Attack Strength
 
     private double CalculateAttackStrength(TeamAIProfile team)
     {
         double score = 0;
 
-        // Goals per game (50%)
-        double leagueAvg = 1.5;
-        double goalsScore = Math.Min((team.AvgGoalsScored / leagueAvg), 2.0) * 50;
-        score += goalsScore;
+        const double leagueAvg = 1.5;
 
-        // Shot accuracy (25%)
-        double shotScore = team.ShotAccuracy * 0.25;
-        score += shotScore;
+        score += Math.Min(
+            (team.AvgGoalsScored / leagueAvg),
+            2.0) * 50;
 
-        // Expected goals (25%)
-        if (team.ExpectedGoals > 0 && team.MatchesPlayed > 0)
+
+        score += team.ShotAccuracy * 0.25;
+
+
+        if (team.ExpectedGoals > 0 &&
+            team.MatchesPlayed > 0)
         {
-            double xgPerGame = team.ExpectedGoals / team.MatchesPlayed;
-            double xgScore = Math.Min((xgPerGame / leagueAvg), 2.0) * 25;
-            score += xgScore;
+            double xg =
+                team.ExpectedGoals /
+                team.MatchesPlayed;
+
+            score += Math.Min(
+                (xg / leagueAvg),
+                2.0) * 25;
         }
         else
         {
-            score += 12.5; // Neutral
+            score += 12.5;
         }
+
 
         return Math.Min(Math.Round(score, 2), 100);
     }
 
-    #endregion
-
-    #region Defense Strength
 
     private double CalculateDefenseStrength(TeamAIProfile team)
     {
         double score = 0;
 
-        // Clean sheet percentage (40%)
-        double cleanSheetScore = team.CleanSheetPercentage * 0.4;
-        score += cleanSheetScore;
+        const double leagueAvg = 1.5;
 
-        // Goals conceded per game (40%)
-        double leagueAvg = 1.5;
-        double concededRatio = Math.Max(0, (leagueAvg - team.AvgGoalsConceded) / leagueAvg);
-        double concededScore = concededRatio * 40;
-        score += concededScore;
+        score += team.CleanSheetPercentage * 0.4;
 
-        // Expected goals against (20%)
-        if (team.ExpectedGoalsAgainst > 0 && team.MatchesPlayed > 0)
+
+        double concededRatio =
+            Math.Max(
+                0,
+                (leagueAvg - team.AvgGoalsConceded)
+                / leagueAvg);
+
+
+        score += concededRatio * 40;
+
+
+        if (team.ExpectedGoalsAgainst > 0 &&
+            team.MatchesPlayed > 0)
         {
-            double xgaPerGame = team.ExpectedGoalsAgainst / team.MatchesPlayed;
-            double xgaRatio = Math.Max(0, (leagueAvg - xgaPerGame) / leagueAvg);
-            score += xgaRatio * 20;
+            double xga =
+                team.ExpectedGoalsAgainst /
+                team.MatchesPlayed;
+
+
+            score += Math.Max(
+                0,
+                (leagueAvg - xga) / leagueAvg)
+                * 20;
         }
         else
         {
-            score += 10; // Neutral
+            score += 10;
         }
+
 
         return Math.Min(Math.Round(score, 2), 100);
     }
 
-    #endregion
 
-    #region Home/Away Factors
-
-    private double CalculateHomeAdvantage(TeamAIProfile team, LeagueAIProfile league)
+    private double CalculateHomeAdvantage(
+        TeamAIProfile team,
+        LeagueAIProfile league)
     {
-        if (team.Last5Home.MatchCount == 0) return 50;
+        if (team.Last5Home.MatchCount == 0)
+            return 50;
 
-        double basescore = (team.Last5Home.PointsPerGame / 3.0) * 70;
-        double leagueBonus = league.HomeAdvantageStrength * 30;
 
-        return Math.Min(Math.Round(basescore + leagueBonus, 2), 100);
+        double score =
+            (team.Last5Home.PointsPerGame / 3.0) * 70;
+
+
+        score += league.HomeAdvantageStrength * 30;
+
+
+        return Math.Min(Math.Round(score, 2), 100);
     }
+
 
     private double CalculateAwayWeakness(TeamAIProfile team)
     {
-        if (team.Last5Away.MatchCount == 0) return 50;
+        if (team.Last5Away.MatchCount == 0)
+            return 50;
 
-        double awayPPG = team.Last5Away.PointsPerGame;
-        double weaknessScore = Math.Max(0, (3.0 - awayPPG) / 3.0) * 100;
 
-        return Math.Round(weaknessScore, 2);
+        return Math.Round(
+            Math.Max(
+                0,
+                (3.0 - team.Last5Away.PointsPerGame) / 3.0)
+            * 100,
+            2);
     }
 
-    #endregion
 
-    #region Head-to-Head
-
-    private double CalculateH2HAdvantage(HeadToHeadInfo h2h, bool isHome)
+    private double CalculateH2HAdvantage(
+        HeadToHeadInfo h2h,
+        bool isHome)
     {
-        if (h2h.TotalMeetings == 0) return 50;
+        if (h2h.TotalMeetings == 0)
+            return 50;
 
-        int wins = isHome ? h2h.HomeWins : h2h.AwayWins;
-        int total = h2h.TotalMeetings;
 
-        double winRate = (double)wins / total;
-        double score = winRate * 100;
+        int wins = isHome
+            ? h2h.HomeWins
+            : h2h.AwayWins;
 
-        return Math.Round(score, 2);
+
+        return Math.Round(
+            ((double)wins / h2h.TotalMeetings) * 100,
+            2);
     }
+
 
     private double CalculateH2HGoalTrend(HeadToHeadInfo h2h)
     {
-        if (h2h.TotalMeetings == 0) return 50;
+        if (h2h.TotalMeetings == 0)
+            return 50;
 
-        // Over 2.5 likelihood
-        return Math.Round(h2h.Over25Percentage, 2);
+
+        return Math.Round(
+            h2h.Over25Percentage,
+            2);
     }
 
-    #endregion
 
-    #region Market Intelligence
-
-    private double CalculateMarketConfidence(MarketOddsInfo odds)
+    private double CalculateMarketConfidence(
+        MarketOddsInfo odds)
     {
-        if (!odds.OddsAvailable) return 50;
+        if (!odds.OddsAvailable)
+            return 50;
 
-        // Lower odds = higher confidence from market
-        double minOdd = Math.Min(odds.HomeWinOdds, Math.Min(odds.DrawOdds, odds.AwayWinOdds));
 
-        // Convert odds to confidence (1.5 = high confidence, 4.0 = low)
-        double confidence = Math.Max(0, (4.0 - minOdd) / 2.5) * 100;
+        double minOdd =
+            Math.Min(
+                odds.HomeWinOdds,
+                Math.Min(
+                    odds.DrawOdds,
+                    odds.AwayWinOdds));
 
-        return Math.Min(Math.Round(confidence, 2), 100);
+
+        double confidence =
+            Math.Max(
+                0,
+                (4.0 - minOdd) / 2.5)
+            * 100;
+
+
+        return Math.Min(
+            Math.Round(confidence, 2),
+            100);
     }
+
 
     private double OddsToProbability(double odds)
     {
-        if (odds <= 1.0) return 0;
-        return Math.Round((1.0 / odds) * 100, 2);
+        if (odds <= 1)
+            return 0;
+
+
+        return Math.Round(
+            (1 / odds) * 100,
+            2);
     }
-
-    #endregion
-}
-
-/// <summary>
-/// Prediction features model
-/// </summary>
-public class PredictionFeatures
-{
-    public int FixtureId { get; set; }
-    public int HomeTeamId { get; set; }
-    public int AwayTeamId { get; set; }
-
-    // Form Features (0-100)
-    public double HomeFormScore { get; set; }
-    public double AwayFormScore { get; set; }
-
-    // Attack Features (0-100)
-    public double HomeAttackStrength { get; set; }
-    public double AwayAttackStrength { get; set; }
-
-    // Defense Features (0-100)
-    public double HomeDefenseStrength { get; set; }
-    public double AwayDefenseStrength { get; set; }
-
-    // Home Advantage (0-100)
-    public double HomeAdvantageScore { get; set; }
-    public double AwayWeaknessScore { get; set; }
-
-    // Head-to-Head (0-100)
-    public double H2HHomeAdvantage { get; set; }
-    public double H2HGoalTrend { get; set; }
-
-    // Market Intelligence (0-100)
-    public double MarketConfidence { get; set; }
-    public double ImpliedHomeProbability { get; set; }
-    public double ImpliedDrawProbability { get; set; }
-    public double ImpliedAwayProbability { get; set; }
-
-    // League Intelligence
-    public double LeagueGoalAverage { get; set; }
-    public double LeagueUnpredictability { get; set; }
-
-    // Data Quality
-    public double DataQualityScore { get; set; }
 }

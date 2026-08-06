@@ -176,7 +176,7 @@ public class FootballApiService : IFootballApiService
         }
     }
 
-    public async Task<ApiResponse<FixtureDto>?> GetFixturesTodayAsync()
+    public async Task<ApiResponse<FixtureDto>?> GetFixturesTodayAsync(CancellationToken cancellationToken = default)
     {
         var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
         var endpoint = $"/fixtures?date={today}";
@@ -184,7 +184,7 @@ public class FootballApiService : IFootballApiService
         return await GetFromApiAsync<FixtureDto>(endpoint, cacheKey);
     }
 
-    public async Task<ApiResponse<FixtureDto>?> GetLiveFixturesAsync()
+    public async Task<ApiResponse<FixtureDto>?> GetLiveFixturesAsync(CancellationToken cancellationToken = default)
     {
         var endpoint = "/fixtures?live=all";
         var cacheKey = "fixtures_live";
@@ -221,42 +221,42 @@ public class FootballApiService : IFootballApiService
         return result;
     }
 
-    public async Task<ApiResponse<FixtureDto>?> GetFixtureByIdAsync(int fixtureId)
+    public async Task<ApiResponse<FixtureDto>?> GetFixtureByIdAsync(int fixtureId, CancellationToken cancellationToken = default)
     {
         var endpoint = $"/fixtures?id={fixtureId}";
         var cacheKey = $"fixture_{fixtureId}";
         return await GetFromApiAsync<FixtureDto>(endpoint, cacheKey);
     }
 
-    public async Task<ApiResponse<StatisticsDto>?> GetStatisticsAsync(int fixtureId)
+    public async Task<ApiResponse<StatisticsDto>?> GetStatisticsAsync(int fixtureId, CancellationToken cancellationToken = default)
     {
         var endpoint = $"/fixtures/statistics?fixture={fixtureId}";
         var cacheKey = $"statistics_{fixtureId}";
         return await GetFromApiAsync<StatisticsDto>(endpoint, cacheKey);
     }
 
-    public async Task<ApiResponse<EventDto>?> GetEventsAsync(int fixtureId)
+    public async Task<ApiResponse<EventDto>?> GetEventsAsync(int fixtureId, CancellationToken cancellationToken = default)
     {
         var endpoint = $"/fixtures/events?fixture={fixtureId}";
         var cacheKey = $"events_{fixtureId}";
         return await GetFromApiAsync<EventDto>(endpoint, cacheKey);
     }
 
-    public async Task<ApiResponse<StandingsDto>?> GetStandingsAsync(int leagueId, int season)
+    public async Task<ApiResponse<StandingsDto>?> GetStandingsAsync(int leagueId, int season, CancellationToken cancellationToken = default)
     {
         var endpoint = $"/standings?league={leagueId}&season={season}";
         var cacheKey = $"standings_{leagueId}_{season}";
         return await GetFromApiAsync<StandingsDto>(endpoint, cacheKey);
     }
 
-    public async Task<ApiResponse<FixtureDto>?> GetHeadToHeadAsync(int team1, int team2)
+    public async Task<ApiResponse<FixtureDto>?> GetHeadToHeadAsync(int team1, int team2, CancellationToken cancellationToken = default)
     {
         var endpoint = $"/fixtures/headtohead?h2h={team1}-{team2}";
         var cacheKey = $"h2h_{team1}_{team2}";
         return await GetFromApiAsync<FixtureDto>(endpoint, cacheKey);
     }
 
-    public async Task<ApiResponse<OddsDto>?> GetOddsAsync(int fixtureId)
+    public async Task<ApiResponse<OddsDto>?> GetOddsAsync(int fixtureId, CancellationToken cancellationToken = default)
     {
         var endpoint = $"/odds?fixture={fixtureId}";
         var cacheKey = $"odds_{fixtureId}";

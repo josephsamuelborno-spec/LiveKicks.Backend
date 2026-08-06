@@ -80,22 +80,23 @@ public class ElitePredictionEngine
         double drawScore = CalculateDrawScore(features);
         double awayScore = CalculateAwayWinScore(features);
 
-        // Determine prediction
-        if (homeScore > drawScore && homeScore > awayScore)
+        // Determine prediction with probability distribution
+        double winnerTotal = homeScore + drawScore + awayScore;
+
+        prediction.Probabilities = new Dictionary<string, double>
         {
-            prediction.Prediction = "HOME";
-            prediction.AIScore = homeScore;
-        }
-        else if (awayScore > homeScore && awayScore > drawScore)
-        {
-            prediction.Prediction = "AWAY";
-            prediction.AIScore = awayScore;
-        }
-        else
-        {
-            prediction.Prediction = "DRAW";
-            prediction.AIScore = drawScore;
-        }
+            ["HOME"] = Math.Round((homeScore / winnerTotal) * 100, 1),
+            ["DRAW"] = Math.Round((drawScore / winnerTotal) * 100, 1),
+            ["AWAY"] = Math.Round((awayScore / winnerTotal) * 100, 1)
+        };
+
+        var winner = prediction.Probabilities
+            .OrderByDescending(x => x.Value)
+            .First();
+
+        prediction.Prediction = winner.Key;
+        prediction.Probability = winner.Value;
+        prediction.AIScore = winner.Value;
 
         // Calculate confidence
         var factorScores = new Dictionary<string, double>
@@ -116,7 +117,7 @@ public class ElitePredictionEngine
         prediction.Reliability = confidenceResult.Reliability;
 
         // Calculate risk
-        prediction.Risk = await _riskAssessment.AssessRiskAsync(features, prediction.Confidence, confidenceResult.Reliability);
+        prediction.Risk = (await _riskAssessment.AssessRiskAsync(features, confidenceResult, context)).Recommendation;
 
         // Generate reasons
         prediction.TopReasons = GenerateMatchWinnerReasons(features, prediction.Prediction);
@@ -200,18 +201,23 @@ public class ElitePredictionEngine
 
         prediction.ExpectedGoals = Math.Round(totalExpectedGoals, 2);
 
-        // Determine prediction
-        if (totalExpectedGoals > 2.5)
-        {
-            prediction.Prediction = "OVER 2.5";
-            prediction.AIScore = Math.Min((totalExpectedGoals / 4.0) * 100, 100);
-        }
-        else
-        {
-            prediction.Prediction = "UNDER 2.5";
-            prediction.AIScore = Math.Min(((4.0 - totalExpectedGoals) / 4.0) * 100, 100);
-        }
+        // Determine prediction with probability distribution
+        double overProbability = Math.Min(95, Math.Max(5, (totalExpectedGoals / 4.0) * 100));
+        double underProbability = 100 - overProbability;
 
+        prediction.Probabilities = new Dictionary<string, double>
+        {
+            ["OVER 2.5"] = Math.Round(overProbability, 1),
+            ["UNDER 2.5"] = Math.Round(underProbability, 1)
+        };
+
+        var result = prediction.Probabilities
+            .OrderByDescending(x => x.Value)
+            .First();
+
+        prediction.Prediction = result.Key;
+        prediction.Probability = result.Value;
+        prediction.AIScore = result.Value;
         // Calculate confidence
         var factorScores = new Dictionary<string, double>
         {
@@ -229,7 +235,7 @@ public class ElitePredictionEngine
 
         prediction.Confidence = confidenceResult.Confidence;
         prediction.Reliability = confidenceResult.Reliability;
-        prediction.Risk = await _riskAssessment.AssessRiskAsync(features, prediction.Confidence, confidenceResult.Reliability);
+        prediction.Risk = (await _riskAssessment.AssessRiskAsync(features, confidenceResult, context)).Recommendation;
 
         prediction.TopReasons = GenerateOverUnderReasons(features, prediction.Prediction, totalExpectedGoals);
 
@@ -305,7 +311,7 @@ public class ElitePredictionEngine
 
         prediction.Confidence = confidenceResult.Confidence;
         prediction.Reliability = confidenceResult.Reliability;
-        prediction.Risk = await _riskAssessment.AssessRiskAsync(features, prediction.Confidence, confidenceResult.Reliability);
+        prediction.Risk = (await _riskAssessment.AssessRiskAsync(features, confidenceResult, context)).Recommendation;
 
         prediction.TopReasons = new List<string>
         {
@@ -360,7 +366,7 @@ public class ElitePredictionEngine
 
         prediction.Confidence = confidenceResult.Confidence;
         prediction.Reliability = confidenceResult.Reliability;
-        prediction.Risk = await _riskAssessment.AssessRiskAsync(features, prediction.Confidence, confidenceResult.Reliability);
+        prediction.Risk = (await _riskAssessment.AssessRiskAsync(features, confidenceResult, context)).Recommendation;
 
         prediction.TopReasons = new List<string> { "Safer betting option", "Covers two outcomes" };
 
@@ -410,7 +416,7 @@ public class ElitePredictionEngine
 
         prediction.Confidence = confidenceResult.Confidence;
         prediction.Reliability = confidenceResult.Reliability;
-        prediction.Risk = await _riskAssessment.AssessRiskAsync(features, prediction.Confidence, confidenceResult.Reliability);
+        prediction.Risk = (await _riskAssessment.AssessRiskAsync(features, confidenceResult, context)).Recommendation;
 
         prediction.TopReasons = new List<string>
         {

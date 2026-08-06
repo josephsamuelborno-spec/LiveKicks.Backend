@@ -86,7 +86,7 @@ public class AIController : ControllerBase
     [ProducesResponseType(typeof(List<Models.AI.RankedPrediction>), 200)]
     [ProducesResponseType(500)]
     public async Task<ActionResult<List<Models.AI.RankedPrediction>>> GetTopPredictions(
-        [FromQuery] int limit = 10,
+        [FromQuery] int limit = 3,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("?? Top predictions requested (limit: {Limit})", limit);
@@ -190,3 +190,4 @@ public class AIController : ControllerBase
         });
     }
 }
+

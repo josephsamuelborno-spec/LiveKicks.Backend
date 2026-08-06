@@ -25,31 +25,33 @@ public class PredictionRankingService
 
         foreach (var (context, predictions) in allPredictions)
         {
-            foreach (var prediction in predictions)
-            {
-                // Skip low-confidence predictions
-                if (prediction.Confidence < 0.60)
-                    continue;
-
-                // Calculate quality score
-                var qualityScore = CalculateQualityScore(prediction, context);
-
-                // Skip poor quality predictions
-                if (qualityScore < 0.50)
-                    continue;
-
-                ranked.Add(new RankedPrediction
+            // Select only the strongest AI market for this fixture
+            var bestPrediction = predictions
+                .Where(p => p.Confidence >= 0.60)
+                .Select(p => new
                 {
-                    FixtureId = context.Fixture.FixtureId,
-                    HomeTeam = context.Fixture.HomeTeam,
-                    AwayTeam = context.Fixture.AwayTeam,
-                    KickoffTime = context.Fixture.KickoffTime,
-                    League = context.League?.Name ?? "Unknown",
-                    Prediction = prediction,
-                    QualityScore = qualityScore,
-                    RankingFactors = BuildRankingFactors(prediction, context, qualityScore)
-                });
-            }
+                    Prediction = p,
+                    Score = CalculateQualityScore(p, context)
+                })
+                .Where(x => x.Score >= 0.50)
+                .OrderByDescending(x => x.Score)
+                .FirstOrDefault();
+
+            if (bestPrediction == null)
+                continue;
+
+            ranked.Add(new RankedPrediction
+            {
+                FixtureId = context.Fixture.FixtureId,
+                HomeTeam = context.Fixture.HomeTeam,
+                AwayTeam = context.Fixture.AwayTeam,
+                KickoffTime = context.Fixture.KickoffTime,
+                League = context.League?.Name ?? "Unknown",
+                Prediction = bestPrediction.Prediction,
+                Probability = bestPrediction.Prediction.Probability,
+                QualityScore = bestPrediction.Score,
+                RankingFactors = BuildRankingFactors(bestPrediction.Prediction, context, bestPrediction.Score)
+            });
         }
 
         // Sort by quality score descending
@@ -74,19 +76,19 @@ public class PredictionRankingService
     {
         double score = 0.0;
 
-        // Base confidence weight (40%)
-        score += prediction.Confidence * 0.40;
+        // Probability weight (40%)
+        score += (prediction.Probability / 100.0) * 0.40;
 
-        // Reliability weight (20%)
-        score += prediction.Reliability * 0.20;
+        // Confidence weight (30%)
+        score += prediction.Confidence * 0.30;
 
         // Data quality weight (15%)
         var dataQuality = context.DataQuality?.OverallQuality ?? 0.5;
         score += dataQuality * 0.15;
 
-        // Market alignment weight (10%)
+        // Market alignment weight (5%)
         var marketAlignment = CalculateMarketAlignment(prediction, context);
-        score += marketAlignment * 0.10;
+        score += marketAlignment * 0.05;
 
         // League quality weight (10%)
         var leagueQuality = CalculateLeagueQuality(context);
@@ -98,9 +100,9 @@ public class PredictionRankingService
 
         // Penalty for high risk
         if (prediction.RiskLevel == "High")
-            score *= 0.7; // 30% penalty
+            score *= 0.6; // 30% penalty
         else if (prediction.RiskLevel == "Medium")
-            score *= 0.85; // 15% penalty
+            score *= 0.8; // 15% penalty
 
         return Math.Min(1.0, score);
     }
@@ -222,16 +224,5 @@ public class PredictionRankingService
         };
     }
 }
+
 
-public class RankedPrediction
-{
-    public int Rank { get; set; }
-    public int FixtureId { get; set; }
-    public string HomeTeam { get; set; } = string.Empty;
-    public string AwayTeam { get; set; } = string.Empty;
-    public DateTime KickoffTime { get; set; }
-    public string League { get; set; } = string.Empty;
-    public PredictionResult Prediction { get; set; } = null!;
-    public double QualityScore { get; set; }
-    public Dictionary<string, object> RankingFactors { get; set; } = new();
-}
