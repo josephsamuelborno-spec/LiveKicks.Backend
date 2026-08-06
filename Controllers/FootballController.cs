@@ -1,5 +1,4 @@
 using LiveKicks.Backend.Services;
-using LiveKicks.Backend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;

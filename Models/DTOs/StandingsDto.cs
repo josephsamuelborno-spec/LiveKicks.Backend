@@ -2,7 +2,7 @@ namespace LiveKicks.Backend.Models.DTOs;
 
 public class StandingsDto
 {
-    public League League { get; set; } = new();
+    public StandingsLeague League { get; set; } = new();
 }
 
 public class StandingsLeague

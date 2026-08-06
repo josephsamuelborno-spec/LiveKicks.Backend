@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace LiveKicks.Backend.Services;
 
-public class FootballApiService
+public class FootballApiService : IFootballApiService
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
@@ -188,6 +188,26 @@ public class FootballApiService
     {
         var endpoint = "/fixtures?live=all";
         var cacheKey = "fixtures_live";
+        // Live fixtures have shorter cache (1 minute max)
+        var cached = _cache.Get<ApiResponse<FixtureDto>>(cacheKey);
+        if (cached != null)
+            return cached;
+
+        var result = await GetFromApiAsync<FixtureDto>(endpoint, cacheKey);
+        if (result != null)
+        {
+            _cache.Set(cacheKey, result, TimeSpan.FromMinutes(1));
+        }
+        return result;
+    }
+
+    // Backward compatibility overload for older AI services
+    public async Task<ApiResponse<FixtureDto>?> GetLiveFixturesAsync(string status)
+    {
+        var endpoint = string.IsNullOrEmpty(status) || status == "all" 
+            ? "/fixtures?live=all" 
+            : $"/fixtures?live={status}";
+        var cacheKey = $"fixtures_live_{status}";
         // Live fixtures have shorter cache (1 minute max)
         var cached = _cache.Get<ApiResponse<FixtureDto>>(cacheKey);
         if (cached != null)

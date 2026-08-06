@@ -3,10 +3,18 @@ namespace LiveKicks.Backend.Models.DTOs;
 public class ApiResponse<T>
 {
     public string Get { get; set; } = string.Empty;
+
     public Parameters Parameters { get; set; } = new();
-    public List<object> Errors { get; set; } = new();
+
+    // API-FOOTBALL returns this as an object when errors exist,
+    // and an empty object/array depending on the response.
+    // Using object prevents JSON deserialization failures.
+    public object? Errors { get; set; }
+
     public int Results { get; set; }
+
     public Paging? Paging { get; set; }
+
     public List<T> Response { get; set; } = new();
 }
 
