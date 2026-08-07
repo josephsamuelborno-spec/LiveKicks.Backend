@@ -9,14 +9,11 @@ namespace LiveKicks.Backend.Controllers;
 [Route("api/[controller]")]
 public class FootballController : ControllerBase
 {
-    // CHANGED: FootballApiService -> IFootballApiService
     private readonly IFootballApiService _footballService;
-
     private readonly ILogger<FootballController> _logger;
     private readonly IConfiguration _configuration;
 
 
-    // CHANGED: FootballApiService -> IFootballApiService
     public FootballController(
         IFootballApiService footballService,
         ILogger<FootballController> logger,
@@ -26,6 +23,7 @@ public class FootballController : ControllerBase
         _logger = logger;
         _configuration = configuration;
     }
+
 
 
     [HttpGet("diagnostics")]
@@ -94,8 +92,11 @@ public class FootballController : ControllerBase
 
 
 
+
+
     [HttpGet("fixtures/today")]
-    public async Task<IActionResult> GetFixturesToday()
+    public async Task<IActionResult> GetFixturesToday(
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -104,7 +105,8 @@ public class FootballController : ControllerBase
 
 
             var result =
-                await _footballService.GetFixturesTodayAsync();
+                await _footballService.GetFixturesTodayAsync(
+                    cancellationToken);
 
 
             if(result == null)
@@ -136,29 +138,68 @@ public class FootballController : ControllerBase
 
 
 
+
+
     [HttpGet("live")]
-    public async Task<IActionResult> GetLiveFixtures()
+    public async Task<IActionResult> GetLiveFixtures(
+        CancellationToken cancellationToken)
     {
-        var result =
-            await _footballService.GetLiveFixturesAsync();
+        try
+        {
+            _logger.LogInformation(
+                "GetLiveFixtures endpoint called");
 
 
-        return result == null
-            ? StatusCode(500, new { message = "Failed to fetch live fixtures" })
-            : Ok(result);
+            var result =
+                await _footballService.GetLiveFixturesAsync(
+                    cancellationToken);
+
+
+            if(result == null)
+            {
+                return Ok(new
+                {
+                    get = "live",
+                    results = 0,
+                    response = new List<object>()
+                });
+            }
+
+
+            return Ok(result);
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to get live fixtures");
+
+
+            return StatusCode(500, new
+            {
+                message = "Failed to fetch live fixtures",
+                error = ex.Message
+            });
+        }
     }
 
 
 
+
+
     [HttpGet("fixture/{id}")]
-    public async Task<IActionResult> GetFixtureById(int id)
+    public async Task<IActionResult> GetFixtureById(
+        int id,
+        CancellationToken cancellationToken)
     {
         if(id <= 0)
             return BadRequest(new { message = "Invalid fixture ID" });
 
 
         var result =
-            await _footballService.GetFixtureByIdAsync(id);
+            await _footballService.GetFixtureByIdAsync(
+                id,
+                cancellationToken);
 
 
         return result == null
@@ -168,11 +209,17 @@ public class FootballController : ControllerBase
 
 
 
+
+
     [HttpGet("statistics/{fixtureId}")]
-    public async Task<IActionResult> GetStatistics(int fixtureId)
+    public async Task<IActionResult> GetStatistics(
+        int fixtureId,
+        CancellationToken cancellationToken)
     {
         var result =
-            await _footballService.GetStatisticsAsync(fixtureId);
+            await _footballService.GetStatisticsAsync(
+                fixtureId,
+                cancellationToken);
 
 
         return result == null
@@ -182,11 +229,17 @@ public class FootballController : ControllerBase
 
 
 
+
+
     [HttpGet("events/{fixtureId}")]
-    public async Task<IActionResult> GetEvents(int fixtureId)
+    public async Task<IActionResult> GetEvents(
+        int fixtureId,
+        CancellationToken cancellationToken)
     {
         var result =
-            await _footballService.GetEventsAsync(fixtureId);
+            await _footballService.GetEventsAsync(
+                fixtureId,
+                cancellationToken);
 
 
         return result == null
@@ -196,15 +249,19 @@ public class FootballController : ControllerBase
 
 
 
+
+
     [HttpGet("standings/{leagueId}")]
     public async Task<IActionResult> GetStandings(
         int leagueId,
-        [FromQuery] int season = 2024)
+        [FromQuery] int season = 2024,
+        CancellationToken cancellationToken = default)
     {
         var result =
             await _footballService.GetStandingsAsync(
                 leagueId,
-                season);
+                season,
+                cancellationToken);
 
 
         return result == null
@@ -214,15 +271,19 @@ public class FootballController : ControllerBase
 
 
 
+
+
     [HttpGet("headtohead/{team1}/{team2}")]
     public async Task<IActionResult> GetHeadToHead(
         int team1,
-        int team2)
+        int team2,
+        CancellationToken cancellationToken)
     {
         var result =
             await _footballService.GetHeadToHeadAsync(
                 team1,
-                team2);
+                team2,
+                cancellationToken);
 
 
         return result == null
@@ -232,17 +293,25 @@ public class FootballController : ControllerBase
 
 
 
+
+
     [HttpGet("odds/{fixtureId}")]
-    public async Task<IActionResult> GetOdds(int fixtureId)
+    public async Task<IActionResult> GetOdds(
+        int fixtureId,
+        CancellationToken cancellationToken)
     {
         var result =
-            await _footballService.GetOddsAsync(fixtureId);
+            await _footballService.GetOddsAsync(
+                fixtureId,
+                cancellationToken);
 
 
         return result == null
             ? StatusCode(500, new { message = "Failed to fetch odds" })
             : Ok(result);
     }
+
+
 
 
 
