@@ -44,22 +44,12 @@ public class FootballDataService : IFootballApiService
     {
         try
         {
-            // Football-Data.org v4 endpoint
-            // Final URL:
-            // https://api.football-data.org/v4/matches
-
-            var endpoint = "matches";
-
-
-            var requestUrl = new Uri(
-                _httpClient.BaseAddress!,
-                endpoint);
+            const string endpoint = "matches";
 
 
             _logger.LogInformation(
-                "Calling FootballData URL: {Url}",
-                requestUrl);
-
+                "Calling FootballData Endpoint: {Endpoint}",
+                endpoint);
 
 
             var response = await _httpClient.GetAsync(
@@ -82,7 +72,7 @@ public class FootballDataService : IFootballApiService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError(
-                    "FootballData API Error: {Response}",
+                    "FootballData Error: {Response}",
                     json);
 
                 return null;
@@ -116,75 +106,75 @@ public class FootballDataService : IFootballApiService
 
 
 
-            foreach (var match in data.Matches)
+            foreach(var match in data.Matches)
             {
-                result.Response.Add(
-                    new FixtureDto
+                result.Response.Add(new FixtureDto
+                {
+                    Fixture = new Fixture
                     {
-                        Fixture = new Fixture
+                        Id = match.Id,
+
+                        Date = match.UtcDate,
+
+                        Timezone = "UTC",
+
+                        Status = new Status
                         {
-                            Id = match.Id,
+                            Long = match.Status ?? "",
 
-                            Date = match.UtcDate,
+                            Short = match.Status ?? ""
+                        }
+                    },
 
-                            Timezone = "UTC",
 
-                            Status = new Status
-                            {
-                                Long = match.Status ?? "",
+                    League = new League
+                    {
+                        Id = match.Competition?.Id ?? 0,
 
-                                Short = match.Status ?? ""
-                            }
+                        Name = match.Competition?.Name ?? "",
+
+                        Country = match.Competition?.Area?.Name ?? ""
+                    },
+
+
+                    Teams = new Teams
+                    {
+                        Home = new Team
+                        {
+                            Id = match.HomeTeam?.Id ?? 0,
+
+                            Name = match.HomeTeam?.Name ?? ""
                         },
 
 
-                        League = new League
+                        Away = new Team
                         {
-                            Id = match.Competition?.Id ?? 0,
+                            Id = match.AwayTeam?.Id ?? 0,
 
-                            Name = match.Competition?.Name ?? "",
-
-                            Country = ""
-                        },
-
-
-                        Teams = new Teams
-                        {
-                            Home = new Team
-                            {
-                                Id = match.HomeTeam?.Id ?? 0,
-
-                                Name = match.HomeTeam?.Name ?? ""
-                            },
+                            Name = match.AwayTeam?.Name ?? ""
+                        }
+                    },
 
 
-                            Away = new Team
-                            {
-                                Id = match.AwayTeam?.Id ?? 0,
+                    Goals = new Goals
+                    {
+                        Home = match.Score?.FullTime?.Home,
 
-                                Name = match.AwayTeam?.Name ?? ""
-                            }
-                        },
+                        Away = match.Score?.FullTime?.Away
+                    },
 
 
-                        Goals = new Goals
+                    Score = new Score
+                    {
+                        Fulltime = new GoalDetail
                         {
                             Home = match.Score?.FullTime?.Home,
 
                             Away = match.Score?.FullTime?.Away
-                        },
-
-
-                        Score = new Score
-                        {
-                            Fulltime = new GoalDetail
-                            {
-                                Home = match.Score?.FullTime?.Home,
-
-                                Away = match.Score?.FullTime?.Away
-                            }
                         }
-                    });
+                    }
+
+                });
             }
 
 
@@ -192,7 +182,7 @@ public class FootballDataService : IFootballApiService
             return result;
 
         }
-        catch (Exception ex)
+        catch(Exception ex)
         {
             _logger.LogError(
                 ex,
@@ -201,6 +191,7 @@ public class FootballDataService : IFootballApiService
             return null;
         }
     }
+
 
 
 
@@ -257,9 +248,13 @@ public class FootballDataService : IFootballApiService
 
 
 
-// ================================
-// Football Data Models
-// ================================
+
+
+
+// =====================================
+// Football-data.org Models
+// =====================================
+
 
 public class FootballDataMatchesResponse
 {
@@ -268,21 +263,29 @@ public class FootballDataMatchesResponse
 
 
 
+
 public class FootballDataMatch
 {
     public int Id { get; set; }
 
+
     public DateTime UtcDate { get; set; }
+
 
     public string? Status { get; set; }
 
+
     public FootballDataCompetition? Competition { get; set; }
+
 
     public FootballDataTeam? HomeTeam { get; set; }
 
+
     public FootballDataTeam? AwayTeam { get; set; }
 
+
     public FootballDataScore? Score { get; set; }
+
 }
 
 
@@ -291,6 +294,17 @@ public class FootballDataCompetition
 {
     public int Id { get; set; }
 
+
+    public string? Name { get; set; }
+
+
+    public FootballDataArea? Area { get; set; }
+}
+
+
+
+public class FootballDataArea
+{
     public string? Name { get; set; }
 }
 
@@ -299,6 +313,7 @@ public class FootballDataCompetition
 public class FootballDataTeam
 {
     public int Id { get; set; }
+
 
     public string? Name { get; set; }
 }
@@ -315,6 +330,7 @@ public class FootballDataScore
 public class FootballDataFullTime
 {
     public int? Home { get; set; }
+
 
     public int? Away { get; set; }
 }
