@@ -16,15 +16,19 @@ public class FootballDataService : IFootballApiService
     {
         _logger = logger;
 
-        _httpClient = httpClientFactory.CreateClient("FootballData");
+        _httpClient =
+            httpClientFactory.CreateClient("FootballData");
 
 
-        var token = configuration["FootballData:ApiToken"];
+        var token =
+            configuration["FootballData:ApiToken"];
 
 
         if (!string.IsNullOrEmpty(token))
         {
-            _httpClient.DefaultRequestHeaders.Remove("X-Auth-Token");
+            _httpClient.DefaultRequestHeaders.Remove(
+                "X-Auth-Token");
+
 
             _httpClient.DefaultRequestHeaders.Add(
                 "X-Auth-Token",
@@ -36,6 +40,7 @@ public class FootballDataService : IFootballApiService
             "FootballData BaseAddress: {BaseAddress}",
             _httpClient.BaseAddress);
     }
+
 
 
 
@@ -52,14 +57,17 @@ public class FootballDataService : IFootballApiService
                 endpoint);
 
 
-            var response = await _httpClient.GetAsync(
-                endpoint,
-                cancellationToken);
+
+            var response =
+                await _httpClient.GetAsync(
+                    endpoint,
+                    cancellationToken);
 
 
 
-            var json = await response.Content.ReadAsStringAsync(
-                cancellationToken);
+            var json =
+                await response.Content.ReadAsStringAsync(
+                    cancellationToken);
 
 
 
@@ -90,25 +98,242 @@ public class FootballDataService : IFootballApiService
 
 
 
-            var result = new ApiResponse<FixtureDto>
+            return MapMatches(data?.Matches);
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "FootballData fixtures failed");
+
+            return null;
+        }
+    }
+
+
+
+
+
+    public async Task<ApiResponse<FixtureDto>?> GetLiveFixturesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var today =
+                await GetFixturesTodayAsync(
+                    cancellationToken);
+
+
+            if(today == null)
+                return null;
+
+
+
+            var liveStatuses = new[]
+            {
+                "IN_PLAY",
+                "PAUSED"
+            };
+
+
+
+            today.Response =
+                today.Response
+                .Where(x =>
+                    liveStatuses.Contains(
+                        x.Fixture.Status.Short))
+                .ToList();
+
+
+
+            today.Results =
+                today.Response.Count;
+
+
+            today.Get = "live";
+
+
+            return today;
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "FootballData live fixtures failed");
+
+            return null;
+        }
+    }
+
+
+
+
+
+    public async Task<ApiResponse<FixtureDto>?> GetFixtureByIdAsync(
+        int fixtureId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var endpoint =
+                $"matches/{fixtureId}";
+
+
+            _logger.LogInformation(
+                "Calling FootballData Fixture: {Endpoint}",
+                endpoint);
+
+
+
+            var response =
+                await _httpClient.GetAsync(
+                    endpoint,
+                    cancellationToken);
+
+
+
+            var json =
+                await response.Content.ReadAsStringAsync(
+                    cancellationToken);
+
+
+
+            if(!response.IsSuccessStatusCode)
+            {
+                _logger.LogError(
+                    "Fixture API Error: {Response}",
+                    json);
+
+                return null;
+            }
+
+
+
+            var data =
+                JsonSerializer.Deserialize<FootballDataSingleMatchResponse>(
+                    json,
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+
+
+
+            return MapMatches(
+                new List<FootballDataMatch>
+                {
+                    data!.Match!
+                });
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Fixture lookup failed");
+
+            return null;
+        }
+    }
+
+
+
+
+
+    public async Task<ApiResponse<StandingsDto>?> GetStandingsAsync(
+        int leagueId,
+        int season,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Football-Data.org uses competition codes
+            // Premier League example:
+            // PL
+
+            string competition = "PL";
+
+
+            var endpoint =
+                $"competitions/{competition}/standings";
+
+
+
+            var response =
+                await _httpClient.GetAsync(
+                    endpoint,
+                    cancellationToken);
+
+
+
+            var json =
+                await response.Content.ReadAsStringAsync(
+                    cancellationToken);
+
+
+
+            if(!response.IsSuccessStatusCode)
+            {
+                _logger.LogError(
+                    "Standings API Error: {Response}",
+                    json);
+
+                return null;
+            }
+
+
+
+            _logger.LogInformation(
+                "Standings received");
+
+
+            // Temporary empty mapping
+            // until Standings DTO is expanded
+            return new ApiResponse<StandingsDto>
+            {
+                Get = endpoint,
+                Results = 0,
+                Response = new List<StandingsDto>()
+            };
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Standings failed");
+
+            return null;
+        }
+    }
+
+
+
+
+
+
+    private ApiResponse<FixtureDto> MapMatches(
+        List<FootballDataMatch>? matches)
+    {
+        var result =
+            new ApiResponse<FixtureDto>
             {
                 Get = "matches",
 
-                Results = data?.Matches?.Count ?? 0,
+                Results = matches?.Count ?? 0,
 
                 Response = new List<FixtureDto>()
             };
 
 
 
-            if (data?.Matches == null)
-                return result;
+        if(matches == null)
+            return result;
 
 
 
-            foreach(var match in data.Matches)
-            {
-                result.Response.Add(new FixtureDto
+        foreach(var match in matches)
+        {
+            result.Response.Add(
+                new FixtureDto
                 {
                     Fixture = new Fixture
                     {
@@ -133,7 +358,8 @@ public class FootballDataService : IFootballApiService
 
                         Name = match.Competition?.Name ?? "",
 
-                        Country = match.Competition?.Area?.Name ?? ""
+                        Country =
+                        match.Competition?.Area?.Name ?? ""
                     },
 
 
@@ -143,7 +369,8 @@ public class FootballDataService : IFootballApiService
                         {
                             Id = match.HomeTeam?.Id ?? 0,
 
-                            Name = match.HomeTeam?.Name ?? ""
+                            Name =
+                            match.HomeTeam?.Name ?? ""
                         },
 
 
@@ -151,61 +378,28 @@ public class FootballDataService : IFootballApiService
                         {
                             Id = match.AwayTeam?.Id ?? 0,
 
-                            Name = match.AwayTeam?.Name ?? ""
+                            Name =
+                            match.AwayTeam?.Name ?? ""
                         }
                     },
 
 
                     Goals = new Goals
                     {
-                        Home = match.Score?.FullTime?.Home,
+                        Home =
+                        match.Score?.FullTime?.Home,
 
-                        Away = match.Score?.FullTime?.Away
-                    },
-
-
-                    Score = new Score
-                    {
-                        Fulltime = new GoalDetail
-                        {
-                            Home = match.Score?.FullTime?.Home,
-
-                            Away = match.Score?.FullTime?.Away
-                        }
+                        Away =
+                        match.Score?.FullTime?.Away
                     }
-
                 });
-            }
-
-
-
-            return result;
-
         }
-        catch(Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "FootballData fixtures request failed");
 
-            return null;
-        }
+
+        return result;
     }
 
 
-
-
-
-    public Task<ApiResponse<FixtureDto>?> GetLiveFixturesAsync(
-        CancellationToken cancellationToken = default)
-        => Task.FromResult<ApiResponse<FixtureDto>?>(null);
-
-
-
-    public Task<ApiResponse<FixtureDto>?> GetFixtureByIdAsync(
-        int fixtureId,
-        CancellationToken cancellationToken = default)
-        => Task.FromResult<ApiResponse<FixtureDto>?>(null);
 
 
 
@@ -223,14 +417,6 @@ public class FootballDataService : IFootballApiService
 
 
 
-    public Task<ApiResponse<StandingsDto>?> GetStandingsAsync(
-        int leagueId,
-        int season,
-        CancellationToken cancellationToken = default)
-        => Task.FromResult<ApiResponse<StandingsDto>?>(null);
-
-
-
     public Task<ApiResponse<FixtureDto>?> GetHeadToHeadAsync(
         int team1,
         int team2,
@@ -243,18 +429,15 @@ public class FootballDataService : IFootballApiService
         int fixtureId,
         CancellationToken cancellationToken = default)
         => Task.FromResult<ApiResponse<OddsDto>?>(null);
-
 }
 
 
 
 
 
-
-// =====================================
-// Football-data.org Models
-// =====================================
-
+// ================================
+// Football Data Models
+// ================================
 
 public class FootballDataMatchesResponse
 {
@@ -262,45 +445,38 @@ public class FootballDataMatchesResponse
 }
 
 
+public class FootballDataSingleMatchResponse
+{
+    public FootballDataMatch? Match { get; set; }
+}
 
 
 public class FootballDataMatch
 {
     public int Id { get; set; }
 
-
     public DateTime UtcDate { get; set; }
-
 
     public string? Status { get; set; }
 
-
     public FootballDataCompetition? Competition { get; set; }
-
 
     public FootballDataTeam? HomeTeam { get; set; }
 
-
     public FootballDataTeam? AwayTeam { get; set; }
 
-
     public FootballDataScore? Score { get; set; }
-
 }
-
 
 
 public class FootballDataCompetition
 {
     public int Id { get; set; }
 
-
     public string? Name { get; set; }
-
 
     public FootballDataArea? Area { get; set; }
 }
-
 
 
 public class FootballDataArea
@@ -309,15 +485,12 @@ public class FootballDataArea
 }
 
 
-
 public class FootballDataTeam
 {
     public int Id { get; set; }
 
-
     public string? Name { get; set; }
 }
-
 
 
 public class FootballDataScore
@@ -326,11 +499,9 @@ public class FootballDataScore
 }
 
 
-
 public class FootballDataFullTime
 {
     public int? Home { get; set; }
-
 
     public int? Away { get; set; }
 }
