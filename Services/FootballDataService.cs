@@ -43,7 +43,6 @@ public class FootballDataService : IFootballApiService
 
 
 
-
     public async Task<ApiResponse<FixtureDto>?> GetFixturesTodayAsync(
         CancellationToken cancellationToken = default)
     {
@@ -52,17 +51,10 @@ public class FootballDataService : IFootballApiService
             const string endpoint = "matches";
 
 
-            _logger.LogInformation(
-                "Calling FootballData Endpoint: {Endpoint}",
-                endpoint);
-
-
-
             var response =
                 await _httpClient.GetAsync(
                     endpoint,
                     cancellationToken);
-
 
 
             var json =
@@ -70,22 +62,14 @@ public class FootballDataService : IFootballApiService
                     cancellationToken);
 
 
-
-            _logger.LogInformation(
-                "FootballData Status: {Status}",
-                response.StatusCode);
-
-
-
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError(
-                    "FootballData Error: {Response}",
+                    "FootballData fixtures error: {Response}",
                     json);
 
                 return null;
             }
-
 
 
             var data =
@@ -95,7 +79,6 @@ public class FootballDataService : IFootballApiService
                     {
                         PropertyNameCaseInsensitive = true
                     });
-
 
 
             return MapMatches(data?.Matches);
@@ -109,8 +92,6 @@ public class FootballDataService : IFootballApiService
             return null;
         }
     }
-
-
 
 
 
@@ -128,13 +109,11 @@ public class FootballDataService : IFootballApiService
                 return null;
 
 
-
             var liveStatuses = new[]
             {
                 "IN_PLAY",
                 "PAUSED"
             };
-
 
 
             today.Response =
@@ -143,7 +122,6 @@ public class FootballDataService : IFootballApiService
                     liveStatuses.Contains(
                         x.Fixture.Status.Short))
                 .ToList();
-
 
 
             today.Results =
@@ -159,12 +137,11 @@ public class FootballDataService : IFootballApiService
         {
             _logger.LogError(
                 ex,
-                "FootballData live fixtures failed");
+                "Live fixtures failed");
 
             return null;
         }
     }
-
 
 
 
@@ -180,9 +157,8 @@ public class FootballDataService : IFootballApiService
 
 
             _logger.LogInformation(
-                "Calling FootballData Fixture: {Endpoint}",
+                "Calling FootballData fixture endpoint {Endpoint}",
                 endpoint);
-
 
 
             var response =
@@ -191,10 +167,15 @@ public class FootballDataService : IFootballApiService
                     cancellationToken);
 
 
-
             var json =
                 await response.Content.ReadAsStringAsync(
                     cancellationToken);
+
+
+
+            _logger.LogInformation(
+                "FootballData fixture status {Status}",
+                response.StatusCode);
 
 
 
@@ -209,8 +190,8 @@ public class FootballDataService : IFootballApiService
 
 
 
-            var data =
-                JsonSerializer.Deserialize<FootballDataSingleMatchResponse>(
+            var match =
+                JsonSerializer.Deserialize<FootballDataMatch>(
                     json,
                     new JsonSerializerOptions
                     {
@@ -219,10 +200,20 @@ public class FootballDataService : IFootballApiService
 
 
 
+            if(match == null)
+            {
+                _logger.LogError(
+                    "Fixture response was empty");
+
+                return null;
+            }
+
+
+
             return MapMatches(
                 new List<FootballDataMatch>
                 {
-                    data!.Match!
+                    match
                 });
         }
         catch(Exception ex)
@@ -238,7 +229,6 @@ public class FootballDataService : IFootballApiService
 
 
 
-
     public async Task<ApiResponse<StandingsDto>?> GetStandingsAsync(
         int leagueId,
         int season,
@@ -246,16 +236,11 @@ public class FootballDataService : IFootballApiService
     {
         try
         {
-            // Football-Data.org uses competition codes
-            // Premier League example:
-            // PL
-
-            string competition = "PL";
+            const string competition = "PL";
 
 
             var endpoint =
                 $"competitions/{competition}/standings";
-
 
 
             var response =
@@ -274,7 +259,7 @@ public class FootballDataService : IFootballApiService
             if(!response.IsSuccessStatusCode)
             {
                 _logger.LogError(
-                    "Standings API Error: {Response}",
+                    "Standings error {Response}",
                     json);
 
                 return null;
@@ -282,12 +267,6 @@ public class FootballDataService : IFootballApiService
 
 
 
-            _logger.LogInformation(
-                "Standings received");
-
-
-            // Temporary empty mapping
-            // until Standings DTO is expanded
             return new ApiResponse<StandingsDto>
             {
                 Get = endpoint,
@@ -308,8 +287,6 @@ public class FootballDataService : IFootballApiService
 
 
 
-
-
     private ApiResponse<FixtureDto> MapMatches(
         List<FootballDataMatch>? matches)
     {
@@ -322,7 +299,6 @@ public class FootballDataService : IFootballApiService
 
                 Response = new List<FixtureDto>()
             };
-
 
 
         if(matches == null)
@@ -356,7 +332,8 @@ public class FootballDataService : IFootballApiService
                     {
                         Id = match.Competition?.Id ?? 0,
 
-                        Name = match.Competition?.Name ?? "",
+                        Name =
+                        match.Competition?.Name ?? "",
 
                         Country =
                         match.Competition?.Area?.Name ?? ""
@@ -445,11 +422,6 @@ public class FootballDataMatchesResponse
 }
 
 
-public class FootballDataSingleMatchResponse
-{
-    public FootballDataMatch? Match { get; set; }
-}
-
 
 public class FootballDataMatch
 {
@@ -469,6 +441,7 @@ public class FootballDataMatch
 }
 
 
+
 public class FootballDataCompetition
 {
     public int Id { get; set; }
@@ -479,10 +452,12 @@ public class FootballDataCompetition
 }
 
 
+
 public class FootballDataArea
 {
     public string? Name { get; set; }
 }
+
 
 
 public class FootballDataTeam
@@ -493,10 +468,12 @@ public class FootballDataTeam
 }
 
 
+
 public class FootballDataScore
 {
     public FootballDataFullTime? FullTime { get; set; }
 }
+
 
 
 public class FootballDataFullTime
