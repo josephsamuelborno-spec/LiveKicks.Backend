@@ -1,7 +1,7 @@
 using LiveKicks.Backend.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace LiveKicks.Backend.Controllers;
 
@@ -31,17 +31,24 @@ public class FootballController : ControllerBase
     {
         try
         {
-            var apiToken = _configuration["FootballData:ApiToken"];
-            var baseUrl = _configuration["FootballData:BaseUrl"];
+            var apiToken =
+                _configuration["FootballData:ApiToken"];
 
-            var tokenExists = !string.IsNullOrEmpty(apiToken);
+            var baseUrl =
+                _configuration["FootballData:BaseUrl"];
 
-            var maskedToken = tokenExists && apiToken!.Length >= 4
+
+            var tokenExists =
+                !string.IsNullOrEmpty(apiToken);
+
+
+            var maskedToken =
+                tokenExists && apiToken!.Length >= 4
                 ? $"{apiToken.Substring(0, 4)}****"
                 : "Not configured";
 
 
-            var diagnostics = new
+            return Ok(new
             {
                 timestamp = DateTime.UtcNow,
 
@@ -49,43 +56,26 @@ public class FootballController : ControllerBase
 
                 configuration = new
                 {
-                    baseUrl = baseUrl ?? "Not configured",
-                    apiTokenConfigured = tokenExists,
-                    apiTokenMasked = maskedToken
-                },
+                    baseUrl =
+                        baseUrl ?? "Not configured",
 
-                environmentVariables = new
-                {
-                    footballDataToken =
-                        !string.IsNullOrEmpty(
-                            Environment.GetEnvironmentVariable("FootballData__ApiToken"))
-                            ? "Set"
-                            : "Not set",
+                    apiTokenConfigured =
+                        tokenExists,
 
-                    footballDataBaseUrl =
-                        !string.IsNullOrEmpty(
-                            Environment.GetEnvironmentVariable("FootballData__BaseUrl"))
-                            ? "Set"
-                            : "Not set"
+                    apiTokenMasked =
+                        maskedToken
                 }
-            };
-
-
-            _logger.LogInformation(
-                "Football-Data diagnostics called. Token configured: {Configured}",
-                tokenExists);
-
-
-            return Ok(diagnostics);
+            });
         }
         catch(Exception ex)
         {
-            _logger.LogError(ex, "Diagnostics failed");
+            _logger.LogError(
+                ex,
+                "Diagnostics failed");
 
-            return StatusCode(500, new
+            return StatusCode(500,new
             {
-                message = "Diagnostics error",
-                error = ex.Message
+                message="Diagnostics error"
             });
         }
     }
@@ -98,42 +88,38 @@ public class FootballController : ControllerBase
     public async Task<IActionResult> GetFixturesToday(
         CancellationToken cancellationToken)
     {
-        try
-        {
-            _logger.LogInformation(
-                "GetFixturesToday endpoint called");
+        var result =
+            await _footballService.GetFixturesTodayAsync(
+                cancellationToken);
 
 
-            var result =
-                await _footballService.GetFixturesTodayAsync(
-                    cancellationToken);
-
-
-            if(result == null)
+        return result == null
+            ? StatusCode(500,new
             {
-                return StatusCode(500, new
-                {
-                    message =
-                    "Failed to fetch fixtures from Football-Data.org"
-                });
-            }
+                message="Failed to fetch today's fixtures"
+            })
+            : Ok(result);
+    }
 
 
-            return Ok(result);
-        }
-        catch(Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Error fetching today's fixtures");
 
 
-            return StatusCode(500, new
+
+    [HttpGet("fixtures/tomorrow")]
+    public async Task<IActionResult> GetFixturesTomorrow(
+        CancellationToken cancellationToken)
+    {
+        var result =
+            await _footballService.GetFixturesTomorrowAsync(
+                cancellationToken);
+
+
+        return result == null
+            ? StatusCode(500,new
             {
-                message = "Internal server error",
-                error = ex.Message
-            });
-        }
+                message="Failed to fetch tomorrow fixtures"
+            })
+            : Ok(result);
     }
 
 
@@ -144,43 +130,19 @@ public class FootballController : ControllerBase
     public async Task<IActionResult> GetLiveFixtures(
         CancellationToken cancellationToken)
     {
-        try
-        {
-            _logger.LogInformation(
-                "GetLiveFixtures endpoint called");
+        var result =
+            await _footballService.GetLiveFixturesAsync(
+                cancellationToken);
 
 
-            var result =
-                await _footballService.GetLiveFixturesAsync(
-                    cancellationToken);
-
-
-            if(result == null)
+        return result == null
+            ? Ok(new
             {
-                return Ok(new
-                {
-                    get = "live",
-                    results = 0,
-                    response = new List<object>()
-                });
-            }
-
-
-            return Ok(result);
-        }
-        catch(Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Failed to get live fixtures");
-
-
-            return StatusCode(500, new
-            {
-                message = "Failed to fetch live fixtures",
-                error = ex.Message
-            });
-        }
+                get="live",
+                results=0,
+                response=new List<object>()
+            })
+            : Ok(result);
     }
 
 
@@ -193,7 +155,12 @@ public class FootballController : ControllerBase
         CancellationToken cancellationToken)
     {
         if(id <= 0)
-            return BadRequest(new { message = "Invalid fixture ID" });
+        {
+            return BadRequest(new
+            {
+                message="Invalid fixture ID"
+            });
+        }
 
 
         var result =
@@ -203,7 +170,42 @@ public class FootballController : ControllerBase
 
 
         return result == null
-            ? StatusCode(500, new { message = "Failed to fetch fixture" })
+            ? StatusCode(500,new
+            {
+                message="Failed to fetch fixture"
+            })
+            : Ok(result);
+    }
+
+
+
+
+
+    [HttpGet("team/{id}/history")]
+    public async Task<IActionResult> GetTeamHistory(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        if(id <= 0)
+        {
+            return BadRequest(new
+            {
+                message="Invalid team ID"
+            });
+        }
+
+
+        var result =
+            await _footballService.GetTeamHistoryAsync(
+                id,
+                cancellationToken);
+
+
+        return result == null
+            ? StatusCode(500,new
+            {
+                message="Failed to fetch team history"
+            })
             : Ok(result);
     }
 
@@ -223,7 +225,10 @@ public class FootballController : ControllerBase
 
 
         return result == null
-            ? StatusCode(500, new { message = "Failed to fetch statistics" })
+            ? StatusCode(500,new
+            {
+                message="Failed to fetch statistics"
+            })
             : Ok(result);
     }
 
@@ -243,7 +248,10 @@ public class FootballController : ControllerBase
 
 
         return result == null
-            ? StatusCode(500, new { message = "Failed to fetch events" })
+            ? StatusCode(500,new
+            {
+                message="Failed to fetch events"
+            })
             : Ok(result);
     }
 
@@ -254,7 +262,7 @@ public class FootballController : ControllerBase
     [HttpGet("standings/{leagueId}")]
     public async Task<IActionResult> GetStandings(
         int leagueId,
-        [FromQuery] int season = 2024,
+        [FromQuery]int season = 2024,
         CancellationToken cancellationToken = default)
     {
         var result =
@@ -265,7 +273,10 @@ public class FootballController : ControllerBase
 
 
         return result == null
-            ? StatusCode(500, new { message = "Failed to fetch standings" })
+            ? StatusCode(500,new
+            {
+                message="Failed to fetch standings"
+            })
             : Ok(result);
     }
 
@@ -287,7 +298,10 @@ public class FootballController : ControllerBase
 
 
         return result == null
-            ? StatusCode(500, new { message = "Failed to fetch head-to-head" })
+            ? StatusCode(500,new
+            {
+                message="Failed to fetch head-to-head"
+            })
             : Ok(result);
     }
 
@@ -307,7 +321,10 @@ public class FootballController : ControllerBase
 
 
         return result == null
-            ? StatusCode(500, new { message = "Failed to fetch odds" })
+            ? StatusCode(500,new
+            {
+                message="Failed to fetch odds"
+            })
             : Ok(result);
     }
 
@@ -320,9 +337,9 @@ public class FootballController : ControllerBase
     {
         return Ok(new
         {
-            status = "healthy",
-            provider = "Football-Data.org",
-            timestamp = DateTime.UtcNow
+            status="healthy",
+            provider="Football-Data.org",
+            timestamp=DateTime.UtcNow
         });
     }
 }

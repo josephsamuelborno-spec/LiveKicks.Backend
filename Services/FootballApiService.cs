@@ -262,4 +262,57 @@ public class FootballApiService : IFootballApiService
         var cacheKey = $"odds_{fixtureId}";
         return await GetFromApiAsync<OddsDto>(endpoint, cacheKey);
     }
+
+public async Task<ApiResponse<FixtureDto>?> GetFixturesTomorrowAsync(
+    CancellationToken cancellationToken = default)
+{
+    var tomorrow = DateTime.UtcNow
+        .AddDays(1)
+        .ToString("yyyy-MM-dd");
+
+    var endpoint = $"/fixtures?date={tomorrow}";
+
+    var cacheKey = $"fixtures_tomorrow_{tomorrow}";
+
+    _logger.LogInformation(
+        "Fetching tomorrow fixtures: {Date}",
+        tomorrow);
+
+    return await GetFromApiAsync<FixtureDto>(
+        endpoint,
+        cacheKey);
+}
+
+
+
+public async Task<ApiResponse<FixtureDto>?> GetTeamHistoryAsync(
+    int teamId,
+    CancellationToken cancellationToken = default)
+{
+    var fromDate = DateTime.UtcNow
+        .AddYears(-1)
+        .ToString("yyyy-MM-dd");
+
+    var toDate = DateTime.UtcNow
+        .ToString("yyyy-MM-dd");
+
+
+    var endpoint =
+        $"/fixtures?team={teamId}&from={fromDate}&to={toDate}";
+
+
+    var cacheKey =
+        $"team_history_{teamId}";
+
+
+    _logger.LogInformation(
+        "Fetching team history: {TeamId}",
+        teamId);
+
+
+    return await GetFromApiAsync<FixtureDto>(
+        endpoint,
+        cacheKey);
+}
+
 }
